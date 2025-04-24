@@ -41,7 +41,7 @@ load(file = here("data/malawi_data.rda"))
 
 ## Github Repo Link
 
-[Sarah's Repo Link (sarahdnor)](https://github.com/stat301-2-2025-winter/final-project-2-sarahdnor.git)
+[Sarah's Repo Link (sarahdnor)](https://github.com/sarahdnor/regression-analysis.git)
 
 :::
 
