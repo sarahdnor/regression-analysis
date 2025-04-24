@@ -1,0 +1,302 @@
+---
+title: "Progress Memo 2"
+subtitle: |
+  | Final Project 
+  | Data Science 2 with R (STAT 301-2)
+author: "Sarah Norman"
+pagetitle: "PM2 Sarah Norman"
+date: "2025-03-07"
+
+format:
+  html:
+    toc: true
+    embed-resources: true
+    
+execute:
+  warning: false
+
+from: markdown+emoji 
+reference-location: margin
+citation-location: margin
+---
+
+```{r}
+#| label: loading-pkgs-data
+#| echo: false
+
+# Loading packages
+library(tidymodels)
+library(tidyverse)
+library(DT)
+library(here)
+
+# handling common conflicts
+tidymodels_prefer()
+
+load(file = here("data/malawi_data.rda"))
+
+```
+
+::: {.callout-tip icon=false}
+
+## Github Repo Link
+
+[Sarah's Repo Link (sarahdnor)](https://github.com/stat301-2-2025-winter/final-project-2-sarahdnor.git)
+
+:::
+
+::: {.callout-tip icon=false}
+
+## Access to Data Source
+
+Link:
+
+[Malawi Longitudinal Study of Families and Health)](https://www.icpsr.umich.edu/web/DSDR/studies/20840)
+
+Apa citation:
+
+Behrman, J. R., Chimbiri, A. M., Chimwaza, A., Kohler, H.-P., & Watkins, S. C. (2008, May 21). Malawi Longitudinal Study of families and Health (MLSFH). Malawi Longitudinal Study of Families and Health (MLSFH). https://www.icpsr.umich.edu/web/DSDR/studies/20840 
+
+:::
+
+## Prediction problem
+
+For this assignment, I aim to predict the future monthly earnings of women in Malawi three years ahead using a variety of predictor variables, including education, demographic characteristics, and occupation.
+
+The Malawi Longitudinal Study of Families and Health (MLSFH) was conducted in two waves on the same set of individuals, with Wave 1 in 1998 collecting baseline data and Wave 2 in 2001 following up with the same individuals. In this prediction problem, the target variable, monthly earnings of Malawian women, will be taken from Wave 2 (2001), while predictor variables will be sourced from Wave 1 (1998). The goal is to predict future earnings three years ahead based on earlier characteristics.
+
+This is a supervised predictive regression problem. The goal of producing these predictive models on earnings is to observe and explore which subsets of variables yield the most accurate predictions and provide insights into the most important factors in predicting earnings. These findings could help inform future research on how Malawian women might optimize their future earnings by highlighting how different models with different subsets of variables predict earnings.
+
+This information may fuel further studies on how women may go about optimizing their future earnings by witnessing patterns in variables and predictions through this report. 
+
+## Why this data
+
+This dataset was introduced to me by a guest lecturer in my International Studies class, Foundations in Global Sustainability. Our guest lecturer, Crystal Burke, emphasized the importance of the dataset's high response rate, considering the number of respondents, the context in which the study took place, and the effort to track down respondents for each wave, all of which contribute to the quantitative strength of the dataset. However, Crystal also highlighted the potential biases in the survey questions and interviews. For example, face-to-face interviews conducted by foreign interviewers may have made respondents hesitant to provide accurate responses. Additionally, bias in question structure, such as using methodologies like asking proportions with beans and two bowls, may have offended respondents and made them feel belittled or undermined. These criticisms will be acknowledged in the report and will also provide valuable reflection post results
+
+As an international studies major I always strive to explore a new country of interest when possible in assignments. Given Malawi’s status as a developing country, I was particularly interested in applying predictive modeling to forecast monthly earnings—an incredibly influential factor for women who face systemic oppression and for those living below the poverty line. I am eager to explore which combinations of variables produce the most accurate predictions, which variables may overpredict or underpredict earnings, and how researchers might use modeling techniques to address missing data in potential future waves of the study. This study might provide insight into which variables could be interesting to explore in future causal research.
+
+## Data source
+
+As mentioned above, the data I will be using for this report is from the Malawi Longitudinal Study of Families and Health (MLSFH) (ICPSR 20840) which was requested and downloaded from Data Sharing for Demographic Research (DSDR), a Population Health Data Archive^[Behrman, J. R., Chimbiri, A. M., Chimwaza, A., Kohler, H.-P., & Watkins, S. C. (2008, May 21). Malawi Longitudinal Study of families and Health (MLSFH).`https://www.icpsr.umich.edu/web/DSDR/studies/20840`]. The study provides demographic, socioeconomic, and health data from rural Malawi, one of the world’s poorest countries. The study has contributed to more than 150 publications and informed health policy in Malawi and Sub-Saharan Africa, focusing on social interactions in demographic behavior, health conditions, HIV risk, and family dynamics.
+
+## Data quality check
+
+# Basic Summary
+From the data summary, we can see that the dataset contains a total of 1,953 rows and 682 columns. Among the columns, 68 are character variables, 24 are logical variables, and 590 are numeric variables. The full summary of the data can be seen in the collapsed callout box below however a basic summary is represented in @tbl-1 and @tbl-2.
+
+```{r}
+#| label: tbl-1
+#| tbl-cap: "Variable Types"
+#| echo: false
+
+basic_summary <- tibble(
+  variable_type = c("character", "logical", "numeric"),
+  n = c(68, 24, 590)
+)
+
+basic_summary|>
+  knitr::kable()
+
+```
+
+```{r}
+#| label: tbl-2
+#| tbl-cap: "Number of Rows and Columns Respectivley"
+#| echo: false
+
+dim(malawi_data) |>
+  knitr::kable(col.names = "n")
+
+```
+
+# Missingness
+
+The data exhibits significant missingness across variables which can be explored in the table below, with 422 variables having over 20% of responses missing. These variables can be explored in @tbl-3. This is understandable, as not all respondents in the study were administered the same set of questions. Some questions were specific to certain waves, some were reserved for particular subgroups, and others were follow-up questions. For instance, questions about the year the 7th marriage ended, the year the 8th marriage ended, and similar queries had 100% missingness. On the other hand, questions considered more core, such as the year the respondent was born, tend to have higher response rates as they were asked to a greater majority of respondents.
+
+```{r}
+#| label: tbl-3
+#| tbl-cap: Percentage of Missingness for Variables with Greater than or Equal to 20% Missingness
+#| echo: false
+
+naniar::miss_var_summary(malawi_data) |>
+  filter(pct_miss >= 20) |>
+  mutate(pct_miss = round(pct_miss, digits = 3)) |>
+  datatable(caption = "Percentage of Missingness for Variables with Greater than or Equal to 20% Missingness")
+
+```
+
+As a result, variables must be carefully filtered and selected for model building due to the large number of potential variables and significant missingness.
+
+# Data tidying
+
+As seen in @tbl-3, all variable names are carefully coded with different number/letter combinations indicating unique questions. However, this can be confusing for analysis and interpretation. As a result, future predictor variables and the target variable may have their naming conventions changed so that variables are less reliant on the codebook and more easily interpreted by the general reader—for example, changing `M2WB1` to `year_born`. However, it would be difficult to do this for all variables. As a result, a future dataset could be created with just the most significant/used variables to make changing names more efficient and the dataset more palatable.
+
+Additionally, some coded values, discussed further in the target variable analysis, are used to represent non-numerical values (e.g., 88 or 77) as another means of inputting N/A, indicating that the respondent "doesn't know." Therefore, the codebook will need to be referenced for the used variables to ensure there isn't a greater range of missing values. It will then have to be assessed, such as whether to impute or remove values.
+
+::: {.callout-note icon=false, collapse="true"}
+
+## Full summary of data
+
+```{r}
+#| label: data-skim
+#| echo: false
+
+skimr::skim_without_charts(malawi_data)
+
+```
+
+:::
+
+## Target variable analysis
+
+Prior to analyzing the distribution of monthly earnings, the codebook states that the values 88 and 5 are inputted as responses to indicate 'other' and 'don't know'. Therefore, these values will be coded as missing and removed, as there cannot be any missing/NA values in the target variable. Despite removing missing/incomplete values there are still 1209 observations that can be used for this exploration.
+
+![Distribution of Monthly Earnings of Malawian Women (Before and After Log Transformation of Earnings)](../figures/earnings_comp.png){#fig-earn}
+
+In @fig-earn, histogram 1 shows that the monthly earnings of Malawian women is unimodal and dramatically right-skewed with a mean of 1,691 MWK. The second histogram shows the distribution of monthly income after it has been log-transformed, resulting in a unimodal distribution that is symmetrical with the peak occurring around 2-2.5 on the log scale (corresponding to earnings between 100 MWK and 316 MWK). The advantages of log-transforming the monthly earnings are that it helps to normalize the distribution, especially when the data is highly skewed as in Histogram 1, which is common with income data. By applying a logarithmic transformation, extremely high values (outliers) have less influence on the model, preventing them from disproportionately affecting the results. Additionally, this transformation can stabilize variance across different levels of earnings, making the relationship between variables more consistent and allowing for more reliable statistical inference. This approach ensures that the model more accurately captures the underlying patterns in the data.
+
+## Methods
+
+As previously mentioned, this predictive problem is a supervised predictive regression problem. It is considered a supervised problem because we have an established target variable (`monthly_earnings`) that we aim to predict using given predictor variables, all of which come from a labeled dataset. Supervised learning involves training predictive models, modeling relationships between variables, making predictions based on these models, and conducting a final evaluation of the chosen model—all of which will be carried out throughout this report.
+
+This is a predictive problem because we are interested in forecasting the earnings of individual Malawian women based on a variety of other surveyed factors. Since the target variable (`monthly_earnings`) is a continuous numerical variable, a regression analysis is the most suitable approach.
+
+When reading in the data, I recoded the target variable `m2we5b` as `monthly_earning`, as `m2we5b` is described in the codebook as "Amount earned last month." Although there can be variability, given that this question focuses on one month's earnings, there is a lack of other alternative earnings-based variables. For the purpose of this study, it will be assumed that monthly earnings are relatively stable; however, this should be considered a limitation of the study and accounted for when examining the final predicted values. 
+
+Many numerical values in the survey were from Likert scale questions; therefore, these variables were changed from numerical and character to factor variables.
+
+A key challenge in this study was the high rate of missing data across variables. Since the survey was quite lengthy and many questions were optional, participants often skipped questions, leading to significant gaps in the dataset. During the recipe-building stage of the models, missing values in nominal predictor variables were imputed using the mode, which represents the most frequent value for each variable. For continuous variables, missing values were imputed using the mean. Both imputation methods are simple yet effective in minimizing bias in the data. Imputing missing values helps maximize the use of available data during model building, with the aim of improving model performance.
+
+::: {.callout-tip}
+## Details for initial setup, model/workflow specs, & preprocessing
+
+I implemented an 80-20 training-test split using stratified sampling (stratified by target variable with 4 strata). The resamples were constructed by taking the training dataset and applying repeated V-fold cross-validation (5 folds, 3 repeats) with stratification on the target variable with 4 strata.
+
+The following model was fitted to the folded data
+
+- Linear model (`lm` engine)
+- Null Model (`parsnip` engine)
+
+The following model types were specified with a plan for tuning hyperparameters using a regular grid:
+
+- Elastic Net (`glmnet` engine)
+  - Mixture was explored over $[0, 1]$ range with 5 levels
+  - Penalty was explored over $[-3, 0]$ range with 5 levels
+- Random forest (`ranger` engine)
+  - Number of trees was explored over $500, 1000]$ with 2 levels
+  - Number of randomly selected predictors to split on was explored over $[1, 3]$ with 10 levels
+  - Minimum number of data points in a node for splitting was explored over $[1, 20]$ with 10 levels
+
+Each of the above-specified models excluding the null will be repeated across three recipes with different sets of predictor variables alongside one recipe using all predictor values.
+
+- One recipe will include **education-related predictor variables**.
+- One recipe will include **demographic-related predictor variables**.
+- One recipe will include **family and house-related predictor variables**.
+- One recipe will include **all the above mentioned predictor variables**.
+
+The random forest models and linear regression models will have different sets of recipes (meaning there will be a total of 8 recipes used across models)
+
+Lastly there will be a separate recipe used for the null model.
+
+The preprocessing/feature engineering for these models can be observed across the scripts `scripts/2_lm_recipes.R script` and `scripts/2_rf_recipes.R script`. To address issues with -Inf values, the target variable will be offset by 1. This slight offset will reduce the occurrence of -Inf values while preserving the overall distribution and relationships within the dataset.
+
+Before any training of models occurs I decided that RMSE would be the metric by which I will compare models.
+:::
+  
+## Model Building & Selection Results
+
+```{r}
+#| label: tbl-lm-model-results
+#| echo: false
+#| tbl-cap: "Linear Model Performance Across Different Predictor Sets"
+
+load(file = here("tables/lm_model_results.rda"))
+
+lm_model_results |> 
+  select(wflow_id, mean, n, std_err) |> 
+  mutate(
+    mean = round(mean, 3),
+    std_err = round(std_err, 3),
+  ) |>
+  knitr::kable()
+
+```
+
+From @tbl-lm-model-results, we can see that the education-based linear model (lm_edu) performed the best across its folds, with the lowest average RMSE of 2.785, indicating it made the most accurate predictions among the models tested. In contrast, the family and house-based linear model performed worse than the null model, with an average RMSE of 2.846.
+
+```{r}
+#| label: tbl-en-model-results
+#| echo: false
+#| tbl-cap: "Elastic Net Tuning Best Model Performance Across Different Predictor Sets"
+
+load(file = here("tables/en_model_results.rda"))
+
+en_model_results |> 
+  select(wflow_id, mean, n, std_err) |>
+  mutate(
+    mean = round(mean, 3),
+    std_err = round(std_err, 3),
+  ) |>
+  knitr::kable()
+```
+
+From @tbl-en-model-results, we can see that the demographics-based model (en_demo) once again performed the best across its folds, with the lowest average RMSE of 2.763, indicating it made the most accurate predictions among the models tested. In contrast, the family and house-based linear model again performed worse than the null model, with an average RMSE of 2.825.
+
+
+
+```{r}
+#| label: tbl-rf-model-results
+#| echo: false
+#| tbl-cap: "Elastic Net Tuning Best Model Performance Across Different Predictor Sets"
+
+load(file = here("tables/rf_model_results.rda"))
+
+rf_model_results |> 
+  select(wflow_id, mean, n, std_err) |> 
+  mutate(
+    mean = round(mean, 3),
+    std_err = round(std_err, 3),
+  ) |>
+  knitr::kable()
+```
+
+
+From @tbl-rf-model-results, we can see that the demographics-based model (en_demo) once again performed the best across its folds, with the lowest average RMSE of 2.763, indicating it made the most accurate predictions among the models tested. In contrast, the family and house-based linear model again performed worse than the null model, with an average RMSE of 2.825.
+
+
+
+## Summary of progress
+I have largely completed the methods section of this report and have made good progress in the model building and selection results section. In the methods section, I have developed and explained three recipes, each utilizing different subsets of predictor variables, as well as a recipe for the null model and one that uses all predictor variables across all recipes. Each recipe includes versions for both linear regression models and random forest models. Currently I have a total of 9 recipes.
+
+I have fitted the ordinary linear models and the null model to the folds, and have tuned the elastic net and random forest models. I have created tables for all of these results above and have begun comparing their performance using RMSE.
+
+## Immediate next steps
+
+I only renamed the target variable from `m2we5b` to `monthly_earning`. However, I intend to rename all used predictor variables in the recipies to the following:
+
+`wb5a`: Ever been to school --> `been_to_school`
+
+`wb5b`: Highest level of School --> `highest_level_school`
+
+`wb5c`: Years completed at educational institution --> `years_school_completed`
+
+`wb6`: Respondent's religion --> `religion`
+
+`wb7`: Respondent's ethnic group --> `ethnicity`
+
+`wb1`: Year respondent born --> `year_born`
+
+`wb2`: Marital Status --> `marital_status`
+
+`wb2a`: Respondent has multiple partners --> `multiple_partners`
+
+`wc5`: Desired # of children --> `desired_num_children` 
+
+I also plan to display the optimal hyperparameters for the models I tuned. Then, I will create another table showing the best-performing recipe for each model (i.e., the best for random forest and the best for elastic net). This will illustrate whether there was a recipe that performed the best across all model types, as well as identify the overall "winning" model across all types. These are the models that I think I will plot. I will also round the standard error and means of the above tables.
+
+I think I might create separate recipes for demographic predictors and education predictors, demographic predictors and house/family predictors, and education and house/family predictors to show the relationships between them.
+
+These are my immediate next steps but there are obvious other parts of the report that I still have to complete such as the final model analysis and conclusion
+
+
+

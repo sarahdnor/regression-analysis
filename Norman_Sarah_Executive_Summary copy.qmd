@@ -1,0 +1,150 @@
+---
+title: "Executive Summary"
+subtitle: | 
+  | A Supervised Regression Analysis of Monthly Earnings Using the Malawi Longitudinal Study of Families and Health 
+  | Final Project
+  | Data Science 2 with R (STAT 301-2)
+author: "Sarah Norman"
+pagetitle: "Sarah Norman"
+date: "2025-03-19"
+
+format:
+  html:
+    toc: true
+    embed-resources: true
+    
+execute:
+  warning: false
+
+from: markdown+emoji 
+reference-location: margin
+citation-location: margin
+---
+
+::: {.callout-tip icon=false}
+
+## Github Repo Link
+
+[Sarah's Repo Link (sarahdnor)](https://github.com/stat301-2-2025-winter/final-project-2-sarahdnor.git)
+
+:::
+
+
+```{r}
+#| label: set-up
+#| echo: false
+
+library(knitr)
+library(kableExtra)
+library(here)
+library(tidymodels)
+library(tidyverse)
+library(stringr)
+
+# handling common conflicts
+tidymodels_prefer()
+```
+
+
+# Prediction Problem
+
+This is a supervised predictive regression problem aimed at predicting the future monthly earnings of women in Malawi three years ahead, using a variety of predictor variables such as education, demographic characteristics, and family life. The data used for predictive modeling in this report is from the Malawi Longitudinal Study of Families and Health (MLSFH) (ICPSR 20840) which was requested and downloaded from Data Sharing for Demographic Research (DSDR), a Population Health Data Archive^[Behrman, J. R., Chimbiri, A. M., Chimwaza, A., Kohler, H.-P., & Watkins, S. C. (2008, May 21). Malawi Longitudinal Study of families and Health (MLSFH).`https://www.icpsr.umich.edu/web/DSDR/studies/20840`]. The goal of producing these predictive models on earnings is to observe and explore which subsets of variables yield the most accurate predictions, display predictive importance, and provide insights for further inferential research on which variables may be the most important factors in predicting earnings.
+
+# Results
+
+::: {.callout-note icon=false}
+
+## RMSE results for all model types and recipes
+
+```{r}
+#| label: tbl-all-results
+#| echo: false
+#| tbl-cap: "Avarage RMSE Across All Model Types and Recipes"
+
+load(file = here("tables/all_results.rda"))
+
+display_results <- all_results |>
+  select(wflow_id, mean, std_err) |>
+  arrange(mean) |>
+  mutate(
+    mean = round(mean, 3),
+    std_err = round(std_err, 3)
+  )
+
+display_results |>
+  kable() |>
+  kable_styling() |>
+   row_spec(which(str_detect(display_results$wflow_id, "_fam")), 
+           background = "#E6E6FA") |>
+  row_spec(which(str_detect(display_results$wflow_id, "demo")), 
+           background = "#E3F2FD") |>
+  row_spec(which(str_detect(display_results$wflow_id, "combined")), 
+           background = "#C8E6FF") |>
+  row_spec(which(str_detect(display_results$wflow_id, "demo_fam")), 
+           background = "#B3E0FF") |>
+  row_spec(which(str_detect(display_results$wflow_id, "edu_demo")), 
+           background = "#D6EAF8")
+ 
+```
+
+:::
+
+Across all models, recipes that incorporated demographic predictors tended to perform relatively well. This can be seen in @tbl-all-results, where recipes including demographic predictors are highlighted in blue and are concentrated at the top of the table (with the table arranged from lowest to highest RMSE). For every model type, recipes using the demographic predictor subset consistently ranked in the top half of said model. Recipes that combined multiple predictor subsets consistently outperformed those that used a single subset. The family and house predictor set tended to perform the worst; in the case of the linear regression models, this recipe performed even worse than the null. For tree-based models, its performance was either equivalent to or only marginally better than the null. This is reinforced by the table above, where models that incorporated family and household predictor variables are concentrated in the lower half of the table.
+
+Despite recipes that combined multiple predictor subsets performing consistently well, the recipe that included all predictor variables was not always the best—or among the best—models. While this recipe ranked well for tree-based models, it performed the worst in linear regression models and was the third-best model for elastic net. This surprising finding could be attributed to overfitting caused by redundant variables or noisy data. In this case, it makes sense that the combined predictors recipe performed best in tree-based models, as they are better equipped to handle noisy data and greater complexity.
+
+## Predictive importance
+
+There are some patterns in the data, as previously mentioned, but they lack significant stability across models. Performance differences, as measured by RMSE, are relatively small, indicating that recipe composition may not lead to substantial improvements in prediction. Therefore, it is challenging to conclude that variations in recipe composition strongly determine predictive importance, aside from the observation that demographic variables generally enhance predictive performance, while family and household-related predictors may not lead to the most accurate predictions.
+
+## Performance of final model
+
+The random forest model was chosen as the final/best model as it had the lowest average RMSE value and relavtivley low standard error which can be seen in @tbl-all-results.
+
+```{r}
+#| label: tbl-final-model-metrics-orig
+#| echo: false
+#| tbl-cap: "Final Model Performance Metrics (Converted to Original Scale)"
+
+load(file = here("tables/final_model_metrics.rda"))
+
+bind_rows(
+  final_model_metrics |>
+    filter(.metric == "rmse" | .metric == "mae") |>
+    mutate(
+      .estimate = round(10^.estimate - 1, 3)
+    ),
+  final_model_metrics |>
+    filter(.metric == "rsq")
+) |>
+  mutate(
+    .estimate = round(.estimate, 3) 
+  ) |> 
+  rename(
+    metric = .metric,
+    estimate = .estimate
+  ) |>
+  select(!.estimator) |> kable()
+```
+
+@tbl-final-model-metrics-orig shows that the model’s typical error is ~13.5 kwacha from the actual value as shown by the RMSE. The mean absolute error of the model is ~7 kwacha. Lastly, the R-squared value of 0.078 indicates that the model only captures 7.8% of the variance in women’s monthly earnings.
+
+Although the errors of this model are relatively small (which we can note by comparing them to the mean monthly earnings calculated where average monthly earnings is ~192), the model actually performs pretty poorly. The R-squared value is very low, meaning the model does not do a good job at explaining variance, indicating that the vast majority of the patterns in monthly earnings cannot be explained by the model.
+
+![Comparison of Final Model's Monthly Earnings Predictions vs. Actual Monthly Earnings](figures/final_pred_graph.png){#fig-final}
+
+@fig-final visually shows a comparison between actual versus predicted monthly earnings where the dashed diagonal line represents perfect predictions. From the figure we can see that the model tends to under predict monthly earnings with a large majority of the points falling significantly below and above the diagonal line. There is only a slight positive linear correlation between predicted and actual values. There is also a notable cluster of points at approximately 2.65 on the y axis, highlighting that the model tends to predict values at this range regardless of actual earnings. There is another cluster of points at 0 on the y-axis, indicating that the model consistently overpredicts.
+
+# Conclusions
+
+Although analysis aimed to compare systematic differences in performance between recipes that used specific predictor variable subsets alongside model types, variation in recipes did not lead to strong conclusions about the predictive importance of certain variables, as no distinct patterns emerged from the data. While further investigation might be valuable to understand why demographic predictor variables appeared to produce the strongest predictive performance in this report, the differences between models remain relatively small across model types.
+
+Future research may also include examining other subsets of predictor variables, such as social or behavioral factors, to further refine predictive modeling and better understand the predictive importance of variables in predicting monthly earnings of women in Malawi. However, this would require analyzing different survey results, as these values were not included in this dataset. Additionally, a more robust predictive model incorporating additional demographic predictors could help determine whether these variables lead to a significant increase in model performance. Furthermore, incorporating interaction terms could provide insights into whether combinations of predictor variables produce unique results.
+
+Although the predictive models show only mild improvements in performance compared to the null model, these findings could still help inform future research. The findings of this report highlighting the need for further refinement of predictive modeling to strengthen predictions and distinguish the predictive power of certain variables that may not have been included in this report. The aforementioned patterns weren’t distinct enough to spur any additional future research, at least with this particular survey.
+
+## Use of AI
+
+This analysis utilized AI, specifically ChatGPT-4 and ChatGPT-3, for problem-solving, as well as for spelling and grammar checks. Text was frequently input into ChatGPT to review and correct spelling and grammar. AI was also approached for sugestions on how to improve descriptions and or analysis. On a few occasions, code was also input into ChatGPT for debugging; however, the platform did not prove to be particularly helpful in this regard, producing overly complicated solutions using unfamiliar functions and arguments. 
+
+For the executive summary, AI was specifically used in the creation of @tbl-all-results to understand how to use functions for color-coding columns.

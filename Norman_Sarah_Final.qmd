@@ -1,0 +1,564 @@
+---
+title: "Predicting Future Earnings of Malawian Women"
+subtitle: |
+  | A Supervised Regression Analysis Using the Malawi Longitudinal Study of Families and Health 
+  | Data Science 2 with R (STAT 301-2)
+author: "Sarah Norman"
+pagetitle: "Final Sarah Norman"
+date: "2025-03-19"
+
+format:
+  html:
+    toc: true
+    embed-resources: true
+    
+execute:
+  warning: false
+
+from: markdown+emoji 
+reference-location: margin
+citation-location: margin
+---
+
+```{r}
+#| label: loading-pkgs-data
+#| echo: false
+
+# Loading packages
+library(tidymodels)
+library(tidyverse)
+library(DT)
+library(here)
+
+# handling common conflicts
+tidymodels_prefer()
+
+load(file = here("data/malawi_data.rda"))
+
+```
+
+::: {.callout-tip icon=false}
+
+## Github Repo Link
+
+[Sarah's Repo Link (sarahdnor)](https://github.com/stat301-2-2025-winter/final-project-2-sarahdnor.git)
+
+:::
+
+::: {.callout-tip icon=false}
+
+## Access to Data Source
+
+Link:
+
+[Malawi Longitudinal Study of Families and Health)](https://www.icpsr.umich.edu/web/DSDR/studies/20840)
+
+Apa citation:
+
+Behrman, J. R., Chimbiri, A. M., Chimwaza, A., Kohler, H.-P., & Watkins, S. C. (2008, May 21). Malawi Longitudinal Study of families and Health (MLSFH). Malawi Longitudinal Study of Families and Health (MLSFH). https://www.icpsr.umich.edu/web/DSDR/studies/20840 
+
+:::
+
+# Introduction
+
+## Prediction problem
+
+For this report, I aim to predict the future monthly earnings of women in Malawi three years ahead using a variety of predictor variables such as those relating to education, demographic characteristics and family life.
+
+The Malawi Longitudinal Study of Families and Health (MLSFH) was conducted in two waves on the same set of individuals, with Wave 1 in 1998 collecting baseline data and Wave 2 in 2001 following up with the same individuals. In this prediction problem, the target variable, monthly earnings of Malawian women, will be taken from Wave 2 (2001), while predictor variables will be sourced from Wave 1 (1998). The goal is to predict future earnings three years ahead based on earlier characteristics.
+
+This is a supervised predictive regression problem. The goal of producing these predictive models on earnings is to observe and explore which subsets of variables yield the most accurate predictions and provide insights for further inferential research studying which variables may be the most important factors in predicting earnings. 
+
+Findings from this report could help inform future research on how Malawian women might optimize their future earnings by highlighting the predictive importance and patterns of different subsets of predictor variables across various model types.
+
+# Data overview
+
+## Why this data
+
+This dataset was introduced to me by a guest lecturer in my International Studies class, Foundations in Global Sustainability. Our guest lecturer, Crystal Burke, emphasized the importance of the dataset's high response rate, considering the number of respondents, the context in which the study took place, and the effort to track down respondents for each wave, all of which contribute to the quantitative strength of the dataset. However, Crystal also highlighted the potential biases in the survey questions and interviews. For example, face-to-face interviews conducted by foreign interviewers may have made respondents hesitant to provide accurate responses. Additionally, bias in question structure, such as using methodologies like asking proportions with beans and two bowls, may have offended respondents and made them feel belittled or undermined. These criticisms are important to take into account when reviewing the reliability of the collected data.
+
+As an International Studies major I always strive to explore a new country of interest when possible in assignments. Given Malawi’s status as a developing country, I was particularly interested in applying predictive modeling to forecast monthly earnings—an incredibly influential factor for women who face systemic oppression and for those living below the poverty line. I am eager to explore which combinations of variables produce the most accurate predictions, which variables may overpredict or underpredict earnings, and how researchers might use modeling techniques to address missing data in potential future waves of the study. As mentioed study might also provide insight into which variables could be interesting to explore in future causal research.
+
+## Data source
+
+As mentioned above, the data I will be using for this report is from the Malawi Longitudinal Study of Families and Health (MLSFH) (ICPSR 20840) which was requested and downloaded from Data Sharing for Demographic Research (DSDR), a Population Health Data Archive^[Behrman, J. R., Chimbiri, A. M., Chimwaza, A., Kohler, H.-P., & Watkins, S. C. (2008, May 21). Malawi Longitudinal Study of families and Health (MLSFH).`https://www.icpsr.umich.edu/web/DSDR/studies/20840`]. The study provides demographic, socioeconomic, and health data from rural Malawi, one of the world’s poorest countries. The study has contributed to more than 150 publications and informed health policy in Malawi and Sub-Saharan Africa, focusing on social interactions in demographic behavior, health conditions, HIV risk, and family dynamics.
+
+## Processed data set
+
+The dataset used throughout this report is a constructed dataset containing information from the Malawi Longitudinal Study of Families and Health (MLSFH) Women's Data, Waves 1 and 2. It includes the variable m2we5b, which represents monthly earnings, along with all columns from Wave 1 of the dataset. This dataset is summarized in the data quality check. Missing and unknown values were removed from the monthly earnings variable, as it is the target variable for this report. This is further discussed in the target variable analysis section.
+
+When reading in the data, I recoded the target variable `m2we5b` as `monthly_earnings`, as `m2we5b` is described in the codebook as "Amount earned last month." Although there can be variability, given that this question focuses on one month's earnings, there is a lack of other alternative earnings-based variables. For the purpose of this study, it will be assumed that monthly earnings are relatively stable; however, this should be considered a limitation of the study and accounted for when examining the final predicted values. 
+
+## Basic Summary
+
+@tbl-data-skim found below in the collapsed call out box provides a full comprehensive summary of the data. From @tbl-data-skim we can see that the dataset contains a total of 1,201 rows and	571 columns. Among the columns,	31 are character variables, 16 are logical variables, and 516 are numeric variables. A basic summary is presented in @tbl-1 and @tbl-2.
+
+```{r}
+#| label: tbl-1
+#| tbl-cap: "Variable Types"
+#| echo: false
+
+basic_summary <- tibble(
+  "Variable Type" = c("character", "logical", "numeric"),
+  Count = c(31, 16, 516)
+)
+
+basic_summary|>
+  knitr::kable()
+
+```
+
+```{r}
+#| label: tbl-2
+#| tbl-cap: "Number of Rows and Columns"
+#| echo: false
+
+data_dim <- tibble(
+  Type = c("Rows", "Columns"),
+  Count = dim(malawi_data)
+)
+
+data_dim |> 
+  knitr::kable(col.names = c("Type", "Count"))
+
+```
+
+## Missingness
+
+The data exhibits significant missingness across variables which can be explored in @tbl-3 below, with 489 variables having over 20% of responses missing. This is understandable, as not all respondents in the study were administered the same set of questions and not all questions were mandatory. Some questions were specific to certain waves, some were reserved for particular subgroups, and others were follow-up questions. For instance, questions about the year the 7th marriage ended, the year the 8th marriage ended, and similar queries had 100% missingness. On the other hand, questions considered more core, such as the year the respondent was born, tend to have higher response rates as they were asked to a greater majority of respondents. 
+
+```{r}
+#| label: tbl-3
+#| tbl-cap: Percentage of Missingness for Variables with Greater than or Equal to 20% Missingness
+#| echo: false
+
+naniar::miss_var_summary(malawi_data) |>
+  filter(pct_miss >= 20) |>
+  mutate(pct_miss = round(pct_miss, digits = 3)) |>
+  datatable(caption = "Percentage of Missingness for Variables with Greater than or Equal to 20% Missingness")
+
+```
+
+As a result, variables must be carefully filtered and selected for model building due to the large number of potential variables and significant missingness.
+
+::: {.callout-note icon=false, collapse="true"}
+
+## Full summary of data
+
+```{r}
+#| label: tbl-data-skim
+#| echo: false
+#| tbl-cap: "Full Skim of Created Malawi Data Set"
+
+skimr::skim_without_charts(malawi_data)
+
+```
+
+:::
+
+## Target variable analysis
+
+Prior to analyzing the distribution of monthly earnings, the codebook states that the values 88 and 5 are inputted as responses to indicate 'other' and 'don't know'. Therefore, these values will be coded as missing and removed, as there cannot be any missing/NA values in the target variable. Despite removing missing/incomplete values there are still 1201 observations that can be used for this exploration as noted in @tbl-2.
+
+![Distribution of Monthly Earnings of Malawian Women (Before and After Log Transformation of Earnings)](figures/earnings_comp.png){#fig-earn}
+
+In @fig-earn, the first histogram shows that the monthly earnings of Malawian women is unimodal and dramatically right-skewed with a mean of ~1,700 MWK. The second histogram shows the distribution of monthly income after it has been log-transformed, resulting in a bimodal distribution with two peaks, one occurring between 2.2-2.5 and one being at 0 on the log scale.
+
+Values 2.2 and 2.5 correspond to earnings between 157 MWK and 316 MWK. The large peak at 0 accounts for the women who indicated no earnings implying they may be unemployed or work without pay. The advantage of log-transforming the monthly earnings is that it helps to normalize the distribution, especially when the data is highly skewed as in histogram 1, which is common with income data. By applying a logarithmic transformation, extremely high values (outliers) have less influence on the model, preventing them from disproportionately affecting the results. Additionally, this transformation can stabilize variance across different levels of earnings, making the relationship between variables more consistent and allowing for more reliable statistical inference. This approach ensures that the model more accurately captures the underlying patterns in the data.
+
+```{r}
+#| label: tbl-average-earnings
+#| echo: false
+#| tbl-cap: "Average Monthly Earnings From Malawi Data Set"
+
+
+bind_cols(
+  malawi_data |> summarise("Average Monthly Earnings" = mean(monthly_earnings)),
+  malawi_data |> summarise("Average Monthly Earnings (Log Scale)" = mean(monthly_earnings_log)),
+   malawi_data |> summarise("Average Monthly Earnings (Back-transformed)" = 10^mean(monthly_earnings_log) - 1)
+) |>
+   mutate(
+    `Average Monthly Earnings` = round(`Average Monthly Earnings`, 3),
+    `Average Monthly Earnings (Log Scale)` = round(`Average Monthly Earnings (Log Scale)`, 3),
+    `Average Monthly Earnings (Back-transformed)` = round(`Average Monthly Earnings (Back-transformed)`, 3)
+  ) |>
+  knitr::kable()
+
+```
+Understanding the average monthly earnings, as shown in @tbl-average-earnings, will help when interpreting future assessment metrics, as metrics such as RMSE and MAE are in the same units as the provided data (Malawian Kwacha or MWK). Knowing these averages will enable meaningful comparisons of RMSE and MAE values, particularly during the final model analysis.
+
+# Methods
+
+As previously mentioned, this predictive problem is a supervised predictive regression problem. It is considered a supervised problem because we have an established target variable (`monthly_earnings`) that we aim to predict using given predictor variables, all of which come from a labeled dataset. Supervised learning involves training predictive models, modeling relationships between variables, making predictions based on these models, and conducting a final evaluation of the chosen model—all of which will be carried out throughout this report.
+
+This is a predictive problem because we are interested in forecasting the earnings of individual Malawian women based on a variety of other surveyed factors. Since the target variable (`monthly_earnings`) is a continuous numerical variable, a regression analysis is the most suitable approach.
+
+## Offsetting and retyping data
+
+A new variable, `monthly_earnings_log`, was created based on the above analysis of the target variable. To address issues with -Inf values, the target variable was offset by 1. This slight offset reduces the occurrence of -Inf values while preserving the overall distribution and relationships within the dataset.
+
+Many numerical values in the survey were from Likert scale questions; therefore, these variables were changed from numerical and character to factor variables.
+
+## Imputation
+
+A key challenge in this study was the high rate of missing data across variables. Since the survey was quite lengthy and many questions were optional, participants often skipped questions, leading to significant gaps in the dataset. During the recipe-building stage of the models, missing values in nominal predictor variables were imputed using the mode, which represents the most frequent value for each variable. For continuous variables, missing values were imputed using the mean. Both imputation methods are simple yet effective in minimizing bias in the data. Imputing missing values helps maximize the use of available data during model building, with the aim of improving model performance.
+
+## Details for initial setup, preprocessing and model/workflow specs
+
+::: {.callout-tip icon=false}
+## Details for initial setup & preprocessing
+
+I implemented an 80-20 training-test split using stratified sampling (stratified by target variable with 4 strata). The resamples were constructed by taking the training dataset and applying repeated V-fold cross-validation (5 folds, 3 repeats) with stratification on the target variable with 4 strata.
+
+The preprocessing/feature engineering for these models included:
+
+- specifying predictors variables
+- imputation of nominal/numerical variables by either the mean or mode
+- dummy encoding nominal variables
+- removing predictors with zero variance
+- centering all numerical predictors
+- scaling all numerical predictors
+
+Tree-based model recipes differ from linear model recipes in that nominal variables are one-hot encoded. Tree based recipes are also used for the k-nearest neighbors models.
+
+The null model recipe, which will be used for comparison across all models, involved using no predictors.
+
+Excluding the null there will be a total of 7 recipes for both the linear models and the tree based models. The difference in each recipe is the subset of predictor variables that are being used to predict the target variables.
+
+- Recipe 1:  **education-related predictor variables**. `edu`
+- Recipe 2: **demographic-related predictor variables**. `demo`
+- Recipe 3: **family and house-related predictor variables**. `fam`
+- Recipe 4: **education-related and family and house-related predictor variables**. `edu_fam`
+- Recipe 5: **education-related and demographic-related predictor variables**. `edu_demo`
+- Recipe 6: **demographic-related and family and house-related predictor variables**. `demo_fam`
+- Recipe 7: **education-related, family and house-related and demographic-related predictor variables**. `combined`
+
+:::
+
+::: {.callout-tip icon=false}
+## Details for model/workflow specs
+
+The following models were fitted to the folded data
+
+- Linear model (`lm` engine)
+- Null model (`parsnip` engine)
+
+The following model types were specified with a plan for tuning hyperparameters using a regular grid:
+
+- Elastic Net (`glmnet` engine)
+  - Mixture was explored over $[0, 1]$ range with 5 levels
+  - Penalty was explored over $[-3, 0]$ range with 5 levels
+- Random forest (`ranger` engine)
+  - Number of trees was explored over $[500, 1000]$ with 5 levels
+  - Number of randomly selected predictors to split on was explored over $[1, 3]$ with 3 levels
+  - Minimum number of data points in a node for splitting was explored over the default range $[2, 40]$ with 5 levels
+- Boosted trees (`xgboost` engine)
+  - Number of trees was explored over $[500, 1000]$ with 5 levels
+  - Number of randomly selected predictors to split on was explored over $[1, 3]$ with 3 levels
+  - Minimum number of data points in a node for splitting was explored over the default range $[2, 40]$ with 5 levels
+  - Learn rate was was explored over the default range $[-10, -1]$ with 3 levels
+- K-nearest neighbors (`kknn` engine)
+  - Number of neighbors was was explored over the default range $[1, 10]$ with 5 levels
+  
+Before any training of models occurred I decided that Root Mean Squared Error (RMSE) would be the metric by which I will compare models.
+
+:::
+  
+# Model Building & Selection Results
+
+Given that the assessment metric for this report is RMSE, which measures the average magnitude of prediction errors, models that produce lower RMSE values will be considered to have better performance.
+
+## Linear models
+
+```{r}
+#| label: tbl-lm-model-results
+#| echo: false
+#| tbl-cap: "Ordinary Linear Regression Model Performance Across Different Predictor Sets"
+
+load(file = here("tables/lm_model_results.rda"))
+
+lm_model_results |> 
+  select(wflow_id, mean, std_err) |> 
+  mutate(
+    mean = round(mean, 3),
+    std_err = round(std_err, 3),
+  ) |>
+  knitr::kable()
+
+```
+
+From @tbl-lm-model-results, we can see that the education-based linear model (`lm_edu`) and the demographics-based linear model (`lm_demo`) performed the best across their folds, both with the lowest average RMSE of 1.210. This indicates that these models made the most accurate predictions among the other models tested. However, the `lm_edu` had a lower standard error of 0.007 (in comparison to `lm_demo` which had a standard error of 0.008). Therefore, `lm_edu` was the best performing ordinary linear regression model. In contrast, the family and house-based linear model performed the worst with an average RMSE of 1.237, performing even worse than the null.
+
+
+```{r}
+#| label: tbl-en-model-results
+#| echo: false
+#| tbl-cap: "Elastic Net Tuning Best Model Performance Across Different Predictor Sets"
+
+load(file = here("tables/en_model_results.rda"))
+
+en_model_results |> 
+  select(wflow_id, mean, std_err) |>
+  mutate(
+    mean = round(mean, 3),
+    std_err = round(std_err, 3),
+  ) |>
+  knitr::kable()
+```
+
+From @tbl-en-model-results, we can see that the education and demographics-based model (`en_edu_demo`) and the education and family and house-based (`en_demo_fam`) model performed the best across their folds, both having the same lowest average RMSE of 1.200 and a standard error of 0.007, indicating that they made the most accurate predictions among the models tested. In contrast, the family and house-based linear model (`en_fam`) performed the same as the null model, with an average RMSE of 1.227 and a standard error of 0.008.
+
+## Tree based models
+
+```{r}
+#| label: tbl-rf-model-results
+#| echo: false
+#| tbl-cap: "Random Forest Tuning Best Model Performance Across Different Predictor Sets"
+
+load(file = here("tables/rf_model_results.rda"))
+
+rf_model_results |> 
+  select(wflow_id, mean, std_err) |> 
+  mutate(
+    mean = round(mean, 3),
+    std_err = round(std_err, 3),
+  ) |>
+  knitr::kable()
+```
+
+
+From @tbl-rf-model-results, we can see that the model that used all the predictors (`rf_combined`) performed the best across its folds, with the lowest average RMSE of 1.196 and standard error of 0.007, indicating that it made the most accurate predictions among the models tested. The family and house-based linear model (`rf_fam`) again performed the worst out of all the created models, but in this case, it was not worse than the null, with an average RMSE of 1.225 and a standard error of 0.007.
+
+
+```{r}
+#| label: tbl-bt-model-results
+#| echo: false
+#| tbl-cap: "Boosted Trees Tuning Best Model Performance Across Different Predictor Sets"
+
+load(file = here("tables/bt_model_results.rda"))
+
+bt_model_results |> 
+  select(wflow_id, mean, std_err) |> 
+  mutate(
+    mean = round(mean, 3),
+    std_err = round(std_err, 3),
+  ) |>
+  knitr::kable()
+```
+
+
+From @tbl-bt-model-results, we can see that the model that used the demographic and family and house-based predictors (`bt_demo_fam`) performed the best across its folds, with the lowest average RMSE of 1.197 and a standard error of 0.008, indicating that it made the most accurate predictions among the models tested. The family and house-based linear model (`bt_fam`) continues to perform poorly, in this case, the worst out of all the created models. However, it was still not worse than the null. The boosted trees model using family and house predictor variables had an RMSE of 1.226 and standard error 0.007.
+
+## K-nearest neighbors
+
+```{r}
+#| label: tbl-knn-model-results
+#| echo: false
+#| tbl-cap: "K-Nearest Neighbors Tuning Best Model Performance Across Different Predictor Sets"
+
+load(file = here("tables/knn_model_results.rda"))
+
+knn_model_results |> 
+  select(wflow_id, mean, n, std_err) |> 
+  mutate(
+    mean = round(mean, 3),
+    std_err = round(std_err, 3),
+  ) |>
+  knitr::kable()
+```
+
+From @tbl-knn-model-results, we can see that all of the k-nearest neighbors models performed worse than the null with the model that used all the predictors (knn_combined) performing the best across its folds, with the lowest average RMSE of 1.508 and a standard error of 0.017, indicating that it made the most accurate predictions among the models tested. However, given that it was still less than the null, it is clear that this model perform really porly with the given recipe and data. This could be attributed to the choice of tuning parameter range, the presence of noisy data, amongst other factors.
+
+# Comparing Best Performing Models Across Model Types
+
+```{r}
+#| label: tbl-best-model-results
+#| echo: false
+#| tbl-cap: "Top-Performing Models Across Different Predictor Sets and Model Types"
+
+load(file = here("tables/best_results_table.rda"))
+
+best_results_table |> 
+  select(wflow_id, mean, std_err) |>
+  mutate(
+    mean = round(mean, 3),
+    std_err = round(std_err, 3),
+  ) |>
+  knitr::kable()
+```
+
+
+
+## Visualizing best performing models
+
+![Performance Comparison of Top Hyperparameter-Tuned Models Across Model Types Against the Null](figures/best_results_graph.png){#fig-best-mods}
+
+When comparing the best-performing models from all the different model types, we can see that the random forest model that used all predictor variables performed the best, with the lowest RMSE value of 1.196 and a standard error of 0.007. @fig-best-mods visualizes the different RMSE values across the best performing models.
+
+From @tbl-best-model-results, we can see that the tree-based models performed better than the linear models and that models incorporating multiple subsets of predictor variables make up the majority of the best models. Only one of the best performing models was a unique subset of predictor variables (`lm_edu`), showing that more predictor variables overall led to better performance. This is not a surprising result, given that more predictor variables mean more data being used for model prediction. 
+
+However, it is important to note that there is significant overlap in the error bars (which is a little difficult to see in the graph but is reinforced by the standard errors seen in @tbl-best-model-results). This suggests that differences in performance metrics may not be statistically significant across models, particularly in the case of the boosted trees model and random forest model. All the created models performed better than the null, implying that building a more complex model was worthwhile in this analysis. Given that the error bars for the boosted trees and random forest models do not overlap with that of the null model, this suggests that these models perform notably better than the null.
+
+## hyperparameters of best performing models
+
+```{r}
+#| label: tbl-final-hyperparameters
+#| echo: false
+#| tbl-cap: "Optimal Hyperparameters for Best Performing Models"
+
+load(file = here("tables/best_hyperparameters.rda"))
+
+best_hyperparameters |> 
+   mutate(
+    penalty = round(penalty, 3)
+  ) |>
+  relocate(model) |>
+  knitr::kable()
+
+```
+
+@tbl-final-hyperparameters shows the hyperparameters used for the best performing models across model types selected by RMSE and displayed in @tbl-best-model-results. Given that the random forest model using all the predictor variables performed the best (albeit marginally compared to some other models) with an RMSE value of 1.196 and 0.007, it will be selected as the final model.
+
+# Assessing Tuning Ranges For Best Performing Models
+
+## Rational for tree based model tuning ranges
+
+The mtry range chosen for tree-based models was $[1, 3]$, explored over 3 levels. This was because the number of predictors used in the recipes ranged from 3 to 7, with one having 10. The number of trees was explored over a range of $[500, 1000]$ with 5 levels, as the number of observations in the training set was less than 1000. Exploring a larger number of trees may not have led to significant improvements in the model while adding computational costs. The range for the minimum number of data points required for node splitting was explored over the default range of $[2, 40]$ with 5 levels. This ensured the existence of both shallow and deep trees and used the emperically chosen range that is most sucessful across data sets. The learning rate was explored over the default range of $[−10,−1]$ with 3 levels, as this is an empirically chosen range that works well for most datasets.
+
+## Graphing tuning ranges for tree based models
+
+![Graph of Tuning Parameters for Best Random Forest Model (All Predictors)](figures/rf_tuned_combined_graph.png){#fig-rf}
+
+Each facet of the above graph represents the number of randomly selected predictor variables (mtry = 1, 2, and 3 respectively). We can see that the chosen mtry value range was suitable given that the RMSE values for the models dropped at mtry level 2. In the second and third facets of the graph we can see that there is a lot of volatility in RMSE values across the different node sizes, with the differences in performance becoming more clear in the last facet. Here we can see that the larger node sizes perform the best. The number of trees does not have a strictly linear relationship with performance, as performance fluctuates across different numbers of trees. This is why the calculations in @tbl-final-hyperparameters are valuable as we can more clearly define that the hyperparameters mtry 3, trees 1000, and minimal node size of 40 resulted in the overall lowest RMSE value and are therefore the best hyperparameters for the model. 
+
+![Graph of Tuning Parameters for Best Boosted Trees Model (Demographics, Family and House Predictors)](figures/bt_tuned_demo_fam_graph.png){#fig-bt}
+
+The faceted plot above displays the RMSE values for different tuning parameter combinations in the boosted tree model. From this graph, we can observe that the first two columns show flat lines with high RMSE values around 2.2, suggesting that these lower learning rates are too small to have any meaningful impact on model performance. The minimal node size at these learning rates has no visible effect, as the lines overlap. In the third column, however, we see that as the learning rate increases, the RMSE values drastically improve. Yet, trends in the bottom row are harder to discern. A slight upward trend indicates that a lower number of trees performs better. This graph emphasizes the importance of tuning the learning rate, as it significantly influenced the performance of the best boosted trees model. The optimal hyperparameters for the best-performing boosted tree model were found to be a learning rate of 0.1, an mtry of 1, 625 trees, and a minimum node size of 40 as seen in @tbl-final-hyperparameters.
+
+## Rational for tuning ranges of elastic net models
+
+Mixture was explored over a range of $[0,1]$, as this is the empirically chosen default that works for most datasets. Penalty, on the other hand, was explored over $[-3,0]$, a range commonly used in logarithmic scale tuning. Both were explored over 5 levels, as this provides solid granularity and ensures the efficiency of the model.
+
+## Graphing tuning ranges for elastic net models
+
+![Graph of Tuning Parameters for Best Elastic Net Model (Education and Demographic Predictors)](figures/en_tuned_edu_demo_graph.png){#fig-en}
+
+The above graph shows how the amount of regularization and proportion of lasso penalty impacts model performance based on RMSE values. From the graph we can see that a median regularization value produces the lowest RMSE values across the proportions of penalty values (excluding a proportion of 0). From @tbl-final-hyperparameters we can see that a 0.178 proportion of lasso penalty coupled with a mixture of 0.25 is what produces the lowest RMSE value and therefore best model for elastic net. This is also clear from the graphic.
+
+## Rational for tuning range for k-nearest neighbors 
+
+The number of neighbors was explored over the default range of $[1, 10]$, as this is the empirically chosen default that works for most datasets. 5 levels were explored to ensure a balanced range of neighbors was considered.
+
+## Graphing tuning range for k-nearest neighbors
+
+![Graphing Tuning Parameters for Best K-Nearest Neighbors (All Predictors)](figures/knn_tuned_demo_fam_graph.png){#fig-knn}
+
+Lastly, analysis of our neighbors range for the best performing k-nearest neighbors model reveals that the default range may actually be too small given that there is a clear downward trend in RMSE with a greater number of neighbors (this trend being notably steep between 1 and 5). Although the rate of improvement slows after a neighbors number of 5, the RMSE value still gradually declines indicating that perhaps a larger maximum for the neighbors range may have resulted in lower RMSE values and better predictive model performance. This may explain why our k-nearest neighbors models performed so poorly (even worse than the null).
+
+# Performance Across Variations in Recipes
+
+## Patterns across best performing models
+
+Excluding the k-nearest neighbors model, of the final five best-performing models, four included the demographic predictor subset. Two of the five best-performing models utilized the recipe that combined all predictor variables, while two others used recipes that included the demographic predictor set along with an additional predictor subset. Only one of the best-performing models used a single predictor subset (ordinary linear regression with education-related predictors). This is seen in @tbl-best-model-results.
+
+## Patterns across all models
+
+Across all models, recipes that incorporated demographic predictors tended to perform relatively well. In every case, recipes using the demographic predictor subset consistently ranked in the top half of the models. Recipes that combined multiple predictor subsets consistently outperformed those that used a single subset. The family and house predictor set tended to perform the worst; in the case of the linear regression models, this recipe performed even worse than the null. For tree-based models, its performance was either equivalent to or only marginally better than the null.
+
+Despite recipes that combined multiple predictor subsets performing consistently well, the recipe that included all predictor variables was not always the best—or among the best—models. While this recipe ranked well for tree-based models, it performed the worst in linear regression models and was the third-best model for elastic net. This surprising finding could be attributed to overfitting caused by redundant variables or noisy data. In this case, it makes sense that the combined predictors recipe performed best in tree-based models, as they are better equipped to handle noisy data and greater complexity.
+
+## Predictive importance
+
+There are some patterns in the data, as previously mentioned, but they are difficult to distinguish and lack significant stability across models. Performance differences, as measured by RMSE, are also relatively small, indicating that recipe composition may not lead to substantial improvements in prediction. Therefore, it is challenging to conclude that variations in recipe composition strongly determine predictive importance, aside from the observation that demographic variables tended to enhance predictive performance, while family and household-related predictor variables lead to worse predictions.
+
+# Analysis of Fitted Final Model
+
+By reviewing @tbl-best-model-results and @tbl-final-hyperparameters, we can see that the Random Forest model using all predictor variables was the best-performing model across all model types, with hyperparameters of an mtry value of 3, 1000 trees, and min_n of 40. This model produced an RMSE value of 1.196	and a standard error of 0.007.
+
+A direct side by side comparison of the models predicted values and actual values can be seen in @tbl-final-model-metrics.
+
+
+```{r}
+#| label: tbl-final-model-metrics
+#| echo: false
+#| tbl-cap: "Final Model Performance Metrics (Log Scale)"
+
+load(file = here("tables/final_model_metrics.rda"))
+
+final_model_metrics |> 
+  select(.metric, .estimate) |>
+  mutate(
+    .estimate = round(.estimate, 3)
+  ) |>
+  rename(
+    metric = .metric,
+    estimate = .estimate
+  ) |>
+  knitr::kable()
+```
+
+```{r}
+#| label: tbl-final-model-metrics-orig
+#| echo: false
+#| tbl-cap: "Final Model Performance Metrics (Converted to Original Scale)"
+
+load(file = here("tables/final_model_metrics.rda"))
+
+final_model_metrics |> 
+  select(.metric, .estimate) |>
+  filter(.metric == "rmse" | .metric == "mae") |>
+  mutate(.estimate = round(10^.estimate - 1, 3)) |>
+  rename(
+    metric = .metric,
+    estimate = .estimate
+  ) |>
+  knitr::kable()
+```
+
+@tbl-final-model-metrics shows that the model's typical error is ~13.5 kwacha from the actual value as shown by the RMSE. The mean absolute error of the model is ~7 kwacha. Lastly, the R-squared value of 0.078 indicates that the model only captures 7.8% of the variance in women's monthly earnings.
+
+Although the errors of this model are relatively small (which we can note by comparing them to the mean monthly earnings calculated in @tbl-average-earnings where average monthly earnings is ~192), the model actually performs pretty poorly. The R-squared value is very low, meaning the model does not do a good job at explaining variance, indicating that the vast majority of the patterns in monthly earnings cannot be explained by the model.
+
+::: {.callout-note icon=false, collapse="true"}
+
+## Predicted versus actual values
+
+```{r}
+#| label: tbl-final-model-results
+#| echo: false
+#| tbl-cap: "Comparison of Final Model Results and Predicted Values"
+
+load(file = here("tables/final_pred.rda"))
+
+final_pred |>
+   mutate(.pred = round(.pred, digits = 3)) |>
+   datatable(caption = "Comparison of Final Model Results and Predicted Values")
+```
+
+::: 
+
+
+![Comparison of Final Model's Monthly Earnings Predictions vs. Actual Monthly Earnings](figures/final_pred_graph.png){#fig-final}
+
+
+@fig-final visually shows a comparison between actual versus predicted monthly earnings where the dashed diagonal line represents perfect predictions. From the figure we can see that the model tends to under predict monthly earnings with a large majority of the points falling significantly below and above the diagonal line. There is only a slight positive linear correlation between predicted and actual values. There is also a notable cluster of points at approximately 2.65 on the y axis, highlighting that the model tends to predict values at this range regardless of actual earnings. There is another cluster of points at 0 on the y-axis, indicating that the model consistently overpredicts.
+
+# Conclusion
+
+Although this analysis aimed to compare systematic differences in performance between recipes that used specific predictor variable subsets alongside model types, variation in recipes did not lead to strong conclusions about the predictive importance of certain variables, as no distinct patterns emerged from the data. While further investigation might be valuable to understand why demographic predictor variables appeared to produce the strongest predictive performance in this report, the differences between models remain relatively small across model types. For example, despite models that included demographic predictor variables in their recipes, @tbl-rf-model-results shows that the four models incorporating demographic predictors varied by an RMSE of only 0.005, which corresponds to just 1.0115 Malawi Kwacha.
+
+Future research may also include examining other subsets of predictor variables, such as social or behavioral factors, to further refine predictive modeling and better understand the predictive importance of variables in predicting monthly earnings of women in Malawi. However, this would require analyzing different survey results, as these values were not included in this dataset. Additionally, a more robust predictive model incorporating additional demographic predictors could help determine whether these variables lead to a significant increase in model performance. Furthermore, incorporating interaction terms could provide insights into whether combinations of predictor variables produce unique results.
+
+Although the predictive models show only mild improvements in performance compared to the null model, these findings could still help inform future research. The findings of this report highlighting the need for further refinement of predictive modeling to strengthen predictions and distinguish the predictive power of certain variables that may not have been included in this report. The aforementioned patterns weren't distinct enough to spur any additional future research, at least with this particular survey.
+
+## Reflection
+
+Conducting a more extensive EDA at the beginning of this report may have led to better anticipation of these findings. Instead, recipe development was informed by a literature review focused on domain knowledge, with variables selected from the given codebook based on the categories they could be sorted into. This approach seemed sufficient at the time, given the small size of the data and the concern that extensive data exploration could lead to data leakage by using the informational power of the data to ensure good model performance. This could have been resolved by choosing a larger dataset or sacrificing a small portion of the data to conduct an EDA of the predictor variables. 
+
+Additionally, given the aforementioned challenges with missingness, imputing the data may not have been the best choice for preprocessing. Instead, perhaps a step for "unknown" should have been used to create an additional factor level in the data.
+
+## Use of AI
+
+This analysis utilized AI, specifically ChatGPT-4 and ChatGPT-3, for problem-solving, as well as for spelling and grammar checks. Text was frequently input into ChatGPT to review and correct spelling and grammar. AI was also approached for sugestions on how to improve descriptions and or analysis. On a few occasions, code was also input into ChatGPT for debugging; however, the platform did not prove to be particularly helpful in this regard, producing overly complicated solutions using unfamiliar functions and arguments. 
+
+
